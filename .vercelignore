@@ -1,0 +1,13 @@
+.git
+node_modules
+build
+visa-draw
+visa-prod
+*.zip
+*.sql
+.env.local
+.env.*.local
+public/entries.json
+public/Screenshot*.png
+public/**/__MACOSX/**
+public/**/._*

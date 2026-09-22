@@ -1,0 +1,230 @@
+import React, { useState, useEffect } from "react";
+import PrizeDropdown from "./components/PrizeDropedown";
+import DrawButton from "./components/DrawButton";
+import WinnerAnimation from "./components/WinnerAnimation";
+import PastWinners from "./components/PastWinners";
+import visaLogo from "./assets/visa-logo.png";
+
+interface Customer {
+  id: number;
+  name: string;
+  bank: string;
+  cardnumber: string;
+  amount: string;
+  date: string;
+  statusid: number;
+}
+
+interface Prize {
+  prizeid: number;
+  prize: string;
+}
+
+const App: React.FC = () => {
+  const [selectedPrize, setSelectedPrize] = useState<string>("");
+  const [winner, setWinner] = useState<Customer | null>(null);
+  const [isDrawing, setIsDrawing] = useState<boolean>(false);
+  const [pastWinners, setPastWinners] = useState<
+    Array<Customer & { prize: string }>
+  >([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [prizes, setPrizes] = useState<Prize[]>([]);
+
+  useEffect(() => {
+    const fetchCustomers = async () => {
+      try {
+        const response = await fetch(
+          "https://draw.fredoms.com/BankingDraw/fetchCustomers"
+        );
+        const data = await response.json();
+        if (data.statusCode === 200) {
+          setCustomers(data.message);
+        }
+      } catch (error) {
+        console.error("Error fetching customers:", error);
+      }
+    };
+
+    const fetchPrizes = async () => {
+      try {
+        const response = await fetch(
+          "https://draw.fredoms.com/BankingDraw/fetchPrizes"
+        );
+        const data = await response.json();
+        if (data.statusCode === 200) {
+          setPrizes(data.message);
+        }
+      } catch (error) {
+        console.error("Error fetching prizes:", error);
+      }
+    };
+
+    fetchCustomers();
+    fetchPrizes();
+  }, []);
+
+  // const sendWinnerToServer = async (winner: Customer, prizeId: number) => {
+  //   try {
+  //     const statusUpdateResponse = await fetch(
+  //       `https://draw.fredoms.com/BankingDraw/updateCustomerStatus/statusid/1/customerid/${winner.id}`,
+  //       {
+  //         method: "GET",
+  //         headers: {
+  //           "Content-Type": "application/json",
+  //         },
+  //       }
+  //     );
+  //     const response = await fetch(
+  //       "https://draw.fredoms.com/BankingDraw/winner",
+  //       {
+  //         method: "POST",
+  //         headers: {
+  //           "Content-Type": "application/json",
+  //         },
+  //         body: JSON.stringify({
+  //           winner: {
+  //             name: winner.name,
+  //             bank: winner.bank,
+  //             cardnumber: winner.cardnumber,
+  //             amount: winner.amount,
+  //             date: winner.date,
+  //             statusid: winner.statusid,
+  //             prizeid: prizeId,
+  //           },
+  //         }),
+  //       }
+  //     );
+
+  //     const data = await response.json();
+  //     if (data.statusCode === 200) {
+  //       console.log("Winner saved successfully:", data.message);
+  //     } else {
+  //       console.error("Error saving winner:", data);
+  //     }
+  //   } catch (error) {
+  //     console.error("Error posting winner to server:", error);
+  //   }
+  // };
+
+  const sendWinnerToServer = async (winner: Customer, prizeId: number) => {
+    try {
+      // Update the status ID of the winner to 1
+      const statusUpdateResponse = await fetch(
+        `https://draw.fredoms.com/BankingDraw/updateCustomerStatus/statusid/1/customerid/${winner.id}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
+  
+      const statusUpdateData = await statusUpdateResponse.json();
+      if (statusUpdateData.statusCode === 200) {
+        console.log("Winner status updated successfully:", statusUpdateData.message);
+  
+        // Now send the winner details to the server
+        const response = await fetch(
+          "https://draw.fredoms.com/BankingDraw/winner",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              winner: {
+                name: winner.name,
+                bank: winner.bank,
+                cardnumber: winner.cardnumber,
+                amount: winner.amount,
+                date: winner.date,
+                statusid: 1,  // Updated status ID
+                prizeid: prizeId,
+              },
+            }),
+          }
+        );
+  
+        const data = await response.json();
+        if (data.statusCode === 200) {
+          console.log("Winner saved successfully:", data.message);
+        } else {
+          console.error("Error saving winner:", data);
+        }
+      } else {
+        console.error("Error updating winner status:", statusUpdateData);
+      }
+    } catch (error) {
+      console.error("Error posting winner to server:", error);
+    }
+  };
+  
+
+  const handleStartDraw = () => {
+    setIsDrawing(true);
+    setWinner(null);
+    setTimeout(() => {
+      let randomWinner: Customer;
+      do {
+        randomWinner = customers[Math.floor(Math.random() * customers.length)];
+      } while (pastWinners.some((w) => w.id === randomWinner.id));
+
+      setWinner(randomWinner);
+
+      // Find the prize ID corresponding to the selected prize
+      const selectedPrizeObj = prizes.find(
+        (prize) => prize.prize === selectedPrize
+      );
+      const prizeId = selectedPrizeObj ? selectedPrizeObj.prizeid : null;
+
+      if (prizeId) {
+        // Save the winner locally and to the server
+        setPastWinners((prevWinners) =>
+          [...prevWinners, { ...randomWinner, prize: selectedPrize }].slice(-5)
+        );
+        sendWinnerToServer(randomWinner, prizeId);
+      } else {
+        console.error("Selected prize not found in the fetched prize list.");
+      }
+
+      setIsDrawing(false);
+    }, 3000);
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-r from-[#00329E] via-[#00329E] to-[#1434CB] p-8 border-8 border-white">
+      <img
+        src={visaLogo}
+        alt="Visa Logo"
+        className="absolute top-4 right-4 h-12"
+      />
+      <h3 className="text-2xl font-bold text-center text-white mb-6">
+        VISA CROSS BORDER CAMPAIGN PROMOTION
+      </h3>
+      <h3 className="text-2xl font-bold text-center text-white mb-6">
+        2024 WINNER SELECTION
+      </h3>
+
+      <div className="flex justify-center mb-8">
+        <PrizeDropdown prizes={prizes.map((p) => p.prize)} onSelect={setSelectedPrize} />
+      </div>
+
+      {/* Flex container for aligning the DrawButton and WinnerAnimation */}
+      <div className="flex justify-center items-center space-x-6 mb-14">
+      <div className="absolute left-[350px]">
+    <DrawButton onStartDraw={handleStartDraw} />
+  </div>
+        <WinnerAnimation customers={customers} winner={winner} prize={selectedPrize} isDrawing={isDrawing} />
+      </div>
+
+
+      <PastWinners winners={pastWinners} />
+
+      <footer className="mt-auto text-center text-white py-4">
+        VERIFIED BY HARRISON & ASSOCIATES INDEPENDENT AUDITORS
+      </footer>
+    </div>
+  );
+};
+
+export default App;
