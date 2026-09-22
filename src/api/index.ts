@@ -1,5 +1,5 @@
 import { Customer } from '../types/Customer';
-import { mockCustomers, mockPrizes, loadEntriesFromFile } from '../data/mock';
+import { mockPrizes, loadEntriesFromFile } from '../data/mock';
 
 export interface Prize { prizeid: number; prize: string }
 
@@ -11,17 +11,6 @@ const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
 // Real endpoints
 const REAL = {
-  async fetchCustomersByStatusId(statusId: number): Promise<Customer[]> {
-    try {
-      const resp = await fetch(`http://localhost:3176/BankingDraw/fetchCustomersByStatus/${statusId}`);
-      const data = await resp.json();
-      if (data.statusCode === 200) return data.message as Customer[];
-      throw new Error('Failed to fetch customers');
-    } catch (err) {
-      console.warn('[API] Falling back to mock customers due to error:', err);
-      return mockCustomers;
-    }
-  },
   async fetchPrizes(): Promise<Prize[]> {
     try {
       const resp = await fetch('http://localhost:3176/BankingDraw/fetchPrizes');
@@ -63,10 +52,6 @@ const REAL = {
 
 // Mock endpoints
 const MOCK = {
-  async fetchCustomersByStatusId(_statusId: number): Promise<Customer[]> {
-    await delay(500);
-    return loadEntriesFromFile();
-  },
   async fetchPrizes(): Promise<Prize[]> {
     await delay(300);
     return mockPrizes;
@@ -81,4 +66,11 @@ const MOCK = {
   },
 };
 
-export const API = USE_MOCK ? MOCK : REAL;
+// Both modes draw from the supplied CSV, imported into public/responseFinal.json.
+export const API = {
+  ...(USE_MOCK ? MOCK : REAL),
+  async fetchCustomersByStatusId(statusId: number): Promise<Customer[]> {
+    const entries = await loadEntriesFromFile();
+    return entries.filter((entry) => entry.statusid === statusId);
+  },
+};

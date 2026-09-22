@@ -4,6 +4,8 @@ This project was bootstrapped with [Create React App](https://github.com/faceboo
 
 ## Draw configuration
 
+Both demo and live modes load customers from `public/responseFinal.json`, imported from `Customers_202609222043.csv`. Only entries matching the requested status (1 for this draw) are eligible. `REACT_APP_USE_MOCK=true` simulates saving winners; `false` uses the existing API for saving winners and updating customer status. It never changes the customer list. Live API endpoints currently point to `http://localhost:3176`.
+
 Configure the draw in the root `.env` file:
 
 ```env
